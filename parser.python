@@ -1,0 +1,71 @@
+import csv
+import json
+import datetime
+import re
+import shlex
+import pandas as pd
+import boto3
+
+s3_bucket='eks-etcd-backups-xenon'
+today= str(datetime.date.today())
+csv_file = "matrics-"+today+".csv"
+
+class Parser:
+    IP = 0
+    DATE = 3
+    TIME = 3
+    TIME_ZONE = 4
+    REQUESTED_URL = 5
+    STATUS_CODE = 6
+    USER_AGENT = 9
+
+    def parse_line(self, line):
+        try:
+            line = re.sub(r"[\[\]]", "", line)
+            data = shlex.split(line)
+            result = {
+                "ip": data[self.IP],
+                "time": data[self.TIME],
+                 "date": data[self.DATE].split(sep=':')[0],
+                "status_code": data[self.STATUS_CODE],
+                "user_agent": data[self.USER_AGENT],
+                "request_url": data[self.REQUESTED_URL]
+            }
+            
+            return result
+        except Exception as e:
+            raise e
+
+
+
+if __name__ == '__main__':
+    parser = Parser()
+    LOG_FILE = "access.log"
+    with open(LOG_FILE, "r") as f:
+        log_entries = [parser.parse_line(line) for line in f]
+
+        # print(log_entries)
+        # print(type(log_entries)).0 
+        # json_str=json.dumps(log_entries)
+        # # print(json_str)
+
+        logs_df = pd.DataFrame(log_entries)
+
+        # logs_df.to_csv(csv_file, index=True)      
+        # print(logs_df.loc[(logs_df["status_code"] == "404")].count())
+        # logs_df= logs_df.sort_values(by='date')
+
+        logs_df.sort_values(by='status_code')
+
+        logs_df[['date','ip','status_code','request_url']].value_counts().to_csv(csv_file, index=True, mode='w',)
+
+        print(logs_df)
+
+
+        # logs_df['status_code'].value_counts().to_csv(csv_file, index=True, mode='a', )
+        # logs_df['request_url'].value_counts().to_csv(csv_file, index=True, mode='a')
+        # print( logs_df)
+date
+s3 = boto3.client('s3')
+s3.upload_file(csv_file, s3_bucket, csv_file)
+
